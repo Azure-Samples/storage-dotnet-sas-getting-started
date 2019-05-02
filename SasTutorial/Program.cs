@@ -71,7 +71,7 @@ namespace SasTutorial
         //      3. Set breakpoints and run the project using F10. 
         // 
         // *************************************************************************************************************************
-        static void Main(string[] args)
+        static void Main()
         {
             const string containerPrefix = "sas-container-";
             const string policyPrefix = "tutorial-policy-";
@@ -115,7 +115,7 @@ namespace SasTutorial
             //Create a new access policy on the container, which may be optionally used to provide constraints for
             //shared access signatures on the container and the blob.
             //The access policy provides create, write, read, list, and delete permissions.
-            CreateSharedAccessPolicy(blobClient, container, sharedAccessPolicyName);
+            CreateSharedAccessPolicy(container, sharedAccessPolicyName);
 
             //Generate an ad-hoc SAS URI for the container. The ad-hoc SAS has write and list permissions.
             string adHocContainerSAS = GetContainerSasUri(container);
@@ -247,10 +247,9 @@ namespace SasTutorial
         /// <summary>
         /// Creates a shared access policy on the container.
         /// </summary>
-        /// <param name="blobClient">A reference to the Blob service client.</param>
         /// <param name="container">A reference to the container.</param>
         /// <param name="policyName">The name of the stored access policy.</param>
-        static void CreateSharedAccessPolicy(CloudBlobClient blobClient, CloudBlobContainer container,
+        static void CreateSharedAccessPolicy(CloudBlobContainer container,
             string policyName)
         {
             //Create a new shared access policy and define its constraints.
