@@ -18,8 +18,8 @@ using System;
 using System.Text;
 using System.IO;
 using Microsoft.Azure;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Blob;
+using Microsoft.Azure.Storage;
+using Microsoft.Azure.Storage.Blob;
 
 namespace SasTutorial
 {
