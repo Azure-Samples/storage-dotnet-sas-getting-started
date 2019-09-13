@@ -1,7 +1,11 @@
 ---
-services: storage
-platforms: dotnet
-author: tamram
+page_type: sample
+languages:
+- csharp
+products:
+- azure
+description: "This sample shows how to generate and use shared access signatures."
+urlFragment: storage-dotnet-sas-getting-started
 ---
 
 # Getting Started with Shared Access Signatures (SAS)
