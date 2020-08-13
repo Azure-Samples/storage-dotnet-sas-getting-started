@@ -16,17 +16,17 @@ If you don't already have a Microsoft Azure subscription, get started with a FRE
 
 ## Running this sample
 
-By default, this sample is configured to run against the storage emulator. You can also modify it to run against your Azure Storage account.
+By default, this sample is configured to run against the Storage Emulator. You can also modify it to run against your Azure Storage account.
 
-To run the sample using the storage emulator (default option):
+To run the sample using the Storage Emulator (default option):
 
-1. Start the Azure storage emulator (once only) by pressing the Start button or the Windows key and searching for it
-by typing "Azure storage emulator". Select it from the list of applications to start it.
+1. Start the Azure Storage Emulator (once only) by pressing the Start button or the Windows key and searching for it
+by typing "Azure Etorage Emulator". Select it from the list of applications to start it.
 2. Set breakpoints and run the project using F10. 
 
 To run the sample using a storage account
 
-1. Open the app.config file and comment out the connection string for the emulator (UseDevelopmentStorage=True) and
+1. Open the app.config file and comment out the connection string for the Emulator (UseDevelopmentStorage=True) and
 uncomment the connection string for the storage service (AccountName=[]...)
 2. Create a storage account through the Azure Portal and provide your [AccountName] and [AccountKey] in 
 the App.Config file. See http://go.microsoft.com/fwlink/?LinkId=325277 for more information
@@ -39,4 +39,4 @@ the App.Config file. See http://go.microsoft.com/fwlink/?LinkId=325277 for more 
 - [Constructing an Account SAS](https://msdn.microsoft.com/library/mt584140.aspx)
 - [Constructing a Service SAS](https://msdn.microsoft.com/library/dn140255.aspx)
 - [Establishing a Stored Access Policy](https://msdn.microsoft.com/library/dn140257.aspx)
-- [Use the Azure storage emulator for Development and Testing](https://azure.microsoft.com/documentation/articles/storage-use-emulator/)
+- [Use the Azure Storage Emulator for Development and Testing](https://azure.microsoft.com/documentation/articles/storage-use-emulator/)
