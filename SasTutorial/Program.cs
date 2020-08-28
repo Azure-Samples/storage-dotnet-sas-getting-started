@@ -18,8 +18,12 @@ using System;
 using System.Text;
 using System.IO;
 using Microsoft.Azure;
-using Microsoft.Azure.Storage;
-using Microsoft.Azure.Storage.Blob;
+using Azure.Storage.Blobs;
+using Azure.Storage;
+using Azure.Storage.Sas;
+using System.Net;
+using Azure.Storage.Blobs.Models;
+using System.Collections.Generic;
 
 namespace SasTutorial
 {
@@ -77,34 +81,31 @@ namespace SasTutorial
             const string policyPrefix = "tutorial-policy-";
 
             const string blobName1 = "sasBlob1.txt";
-            const string blobContent1 = "Blob created with an ad-hoc SAS granting write permissions on the container.";
+            const string blobContent1 = "Blob created with an container SAS with store access policy granting all permissions on the container.";
 
             const string blobName2 = "sasBlob2.txt";
-            const string blobContent2 = "Blob created with a SAS based on a stored access policy granting write permissions on the container.";
+            const string blobContent2 = "Blob created with a blob SAS with store access policy granting all permissions to the blob.";
 
             const string blobName3 = "sasBlob3.txt";
-            const string blobContent3 = "Blob created with an ad-hoc SAS granting create/write permissions to the blob.";
+            const string blobContent3 = "Blob created with an container SAS granting all permissions on the container.";
 
             const string blobName4 = "sasBlob4.txt";
-            const string blobContent4 = "Blob created with a SAS based on a stored access policy granting create/write permissions to the blob."; ;
+            const string blobContent4 = "Blob created with a blob SAS granting all permissions to the blob.";
 
             string containerName = containerPrefix + DateTime.Now.Ticks.ToString();
-            string sharedAccessPolicyName = policyPrefix + DateTime.Now.Ticks.ToString();
+            string storeAccessPolicyName = policyPrefix + DateTime.Now.Ticks.ToString();
 
             //Parse the connection string and return a reference to the storage account.
-            CloudStorageAccount storageAccount = CloudStorageAccount.Parse(CloudConfigurationManager.GetSetting("StorageConnectionString"));
-
-            //Create the blob client object.
-            CloudBlobClient blobClient = storageAccount.CreateCloudBlobClient();
+            BlobServiceClient blobServiceClient = new BlobServiceClient(CloudConfigurationManager.GetSetting("StorageConnectionString"));
 
             //Get a reference to a container to use for the sample code, and create it if it does not exist.
-            CloudBlobContainer container = blobClient.GetContainerReference(containerName);
+            BlobContainerClient container = blobServiceClient.GetBlobContainerClient(containerName);
 
             try 
             { 
                 container.CreateIfNotExists();
             }
-            catch (StorageException)
+            catch (Exception)
             {
                 // Ensure that the storage emulator is running if using emulator connection string.
                 Console.WriteLine("If you are running with the default connection string, please make sure you have started the storage emulator. Press the Windows key and type Azure Storage to select and run it from the list of applications - then restart the sample.");
@@ -115,46 +116,48 @@ namespace SasTutorial
             //Create a new access policy on the container, which may be optionally used to provide constraints for
             //shared access signatures on the container and the blob.
             //The access policy provides create, write, read, list, and delete permissions.
-            CreateSharedAccessPolicy(container, sharedAccessPolicyName);
+            StorageSharedKeyCredential storageSharedKeyCredential = new StorageSharedKeyCredential(blobServiceClient.AccountName, CloudConfigurationManager.GetSetting("AzureStorageEmulatorAccountKey"));
 
-            //Generate an ad-hoc SAS URI for the container. The ad-hoc SAS has write and list permissions.
-            string adHocContainerSAS = GetContainerSasUri(container);
-            Console.WriteLine("1. SAS for blob container (ad hoc): " + adHocContainerSAS);
+            CreateStoreAccessPolicy(container, storeAccessPolicyName);
+
+            //Generate an  SAS URI for the container. The  SAS has all permissions.
+            UriBuilder storeContainerSAS = GetContainerSasUri(container, storeAccessPolicyName, storageSharedKeyCredential);
+            Console.WriteLine("1. SAS for blob container : " + storeContainerSAS);
             Console.WriteLine();
 
             //Test the SAS to ensure it works as expected.
-            //The write and list operations should succeed, and the read and delete operations should fail.
-            TestContainerSAS(adHocContainerSAS, blobName1, blobContent1);
+            //The write, read, and delete operations should  succeed, and the list operations should fail.
+            TestContainerSAS(storeContainerSAS, blobName1, blobContent1);
             Console.WriteLine();
 
-            //Generate a SAS URI for the container, using the stored access policy to set constraints on the SAS.
-            string sharedPolicyContainerSAS = GetContainerSasUri(container, sharedAccessPolicyName);
-            Console.WriteLine("2. SAS for blob container (stored access policy): " + sharedPolicyContainerSAS);
-            Console.WriteLine();
-
-            //Test the SAS to ensure it works as expected.
-            //The write, read, list, and delete operations should all succeed.
-            TestContainerSAS(sharedPolicyContainerSAS, blobName2, blobContent2);
-            Console.WriteLine();
-
-            //Generate an ad-hoc SAS URI for a blob within the container. The ad-hoc SAS has create, write, and read permissions.
-            string adHocBlobSAS = GetBlobSasUri(container, blobName3, null);
-            Console.WriteLine("3. SAS for blob (ad hoc): " + adHocBlobSAS);
-            Console.WriteLine();
+            //Generate an  SAS URI for the container. The  SAS has all permissions.
+            UriBuilder containerSAS = GetContainerSasUri(container, storageSharedKeyCredential);
+            Console.WriteLine("1. SAS for blob container : " + containerSAS);
+            Console.WriteLine(); 
 
             //Test the SAS to ensure it works as expected.
-            //The create, write, and read operations should succeed, and the delete operation should fail.
-            TestBlobSAS(adHocBlobSAS, blobContent3);
+            //The write, read, and delete operations should  succeed, and the list operations should fail.
+            TestContainerSAS(containerSAS, blobName3, blobContent3);
             Console.WriteLine();
 
-            //Generate a SAS URI for a blob within the container, using the stored access policy to set constraints on the SAS.
-            string sharedPolicyBlobSAS = GetBlobSasUri(container, blobName4, sharedAccessPolicyName);
-            Console.WriteLine("4. SAS for blob (stored access policy): " + sharedPolicyBlobSAS);
+            //Generate an  SAS URI for a blob within the container. The  SAS has all permissions.
+            UriBuilder storeBlobSAS = GetBlobSasUri(container, blobName2, storageSharedKeyCredential);
+            Console.WriteLine("3. SAS for blob : " + storeBlobSAS);
             Console.WriteLine();
 
             //Test the SAS to ensure it works as expected.
             //The create, write, read, and delete operations should all succeed.
-            TestBlobSAS(sharedPolicyBlobSAS, blobContent4);
+            TestBlobSAS(storeBlobSAS, blobContent2);
+            Console.WriteLine();
+
+            //Generate an  SAS URI for a blob within the container. The  SAS has all permissions.
+            UriBuilder blobSAS = GetBlobSasUri(container, blobName4, storageSharedKeyCredential);
+            Console.WriteLine("3. SAS for blob : " + blobSAS);
+            Console.WriteLine();
+
+            //Test the SAS to ensure it works as expected.
+            //The create, write, read, and delete operations should all succeed.
+            TestBlobSAS(blobSAS, blobContent4);
             Console.WriteLine();
 
             //Delete the container to clean up.
@@ -167,39 +170,48 @@ namespace SasTutorial
         /// Returns a URI containing a SAS for the blob container.
         /// </summary>
         /// <param name="container">A reference to the container.</param>
-        /// <param name="storedPolicyName">A string containing the name of the stored access policy. If null, an ad-hoc SAS is created.</param>
+        /// <param name="StorageSharedKeyCredential">Storage Shared Key Credential.</param>
         /// <returns>A string containing the URI for the container, with the SAS token appended.</returns>
-        static string GetContainerSasUri(CloudBlobContainer container, string storedPolicyName = null)
+        static UriBuilder GetContainerSasUri(BlobContainerClient container, StorageSharedKeyCredential storageSharedKeyCredential)
         {
-            string sasContainerToken;
-
-            // If no stored policy is specified, create a new access policy and define its constraints.
-            if (storedPolicyName == null)
+            var policy = new BlobSasBuilder
             {
-                // Note that the SharedAccessBlobPolicy class is used both to define the parameters of an ad-hoc SAS, and 
-                // to construct a shared access policy that is saved to the container's shared access policies. 
-                SharedAccessBlobPolicy adHocPolicy = new SharedAccessBlobPolicy()
-                {
-                    // Set start time to five minutes before now to avoid clock skew.
-                    SharedAccessStartTime = DateTime.UtcNow.AddMinutes(-5),
-                    SharedAccessExpiryTime = DateTime.UtcNow.AddHours(24),
-                    Permissions = SharedAccessBlobPermissions.Write | SharedAccessBlobPermissions.List
-                };
+                Protocol = SasProtocol.HttpsAndHttp,
 
-                //Generate the shared access signature on the container, setting the constraints directly on the signature.
-                sasContainerToken = container.GetSharedAccessSignature(adHocPolicy, null);
-            }
-            else
-            {
-                //Generate the shared access signature on the container. In this case, all of the constraints for the
-                //shared access signature are specified on the stored access policy, which is provided by name.
-                //It is also possible to specify some constraints on an ad-hoc SAS and others on the stored access policy.
-                //However, a constraint must be specified on one or the other; it cannot be specified on both.
-                sasContainerToken = container.GetSharedAccessSignature(null, storedPolicyName);
-            }
-
+                BlobContainerName = container.Name,
+                Resource = "c",
+                StartsOn = DateTimeOffset.UtcNow,
+                ExpiresOn = DateTimeOffset.UtcNow.AddHours(1),
+                IPRange = new SasIPRange(IPAddress.None, IPAddress.None)
+            };
+            policy.SetPermissions(BlobSasPermissions.All);
+            var sas = policy.ToSasQueryParameters(storageSharedKeyCredential).ToString();
+            UriBuilder sasUri = new UriBuilder(container.Uri);
+            sasUri.Query = sas;
             //Return the URI string for the container, including the SAS token.
-            return container.Uri + sasContainerToken;
+            return sasUri;
+        }
+
+        /// <summary>
+        /// Returns a URI containing a SAS for the blob container.
+        /// </summary>
+        /// <param name="container">A reference to the container.</param>
+        /// <param name="storedPolicyName">A string containing the name of the stored access policy.</param>
+        /// <param name="StorageSharedKeyCredential">Storage Shared Key Credential.</param>
+        /// <returns>A string containing the URI for the container, with the SAS token appended.</returns>
+        static UriBuilder GetContainerSasUri(BlobContainerClient container, string storeAccessPolicyName, StorageSharedKeyCredential storageSharedKeyCredential)
+        {
+            var policy = new BlobSasBuilder
+            {
+                BlobContainerName = container.Name,
+                Identifier = storeAccessPolicyName
+
+            };
+            var sas = policy.ToSasQueryParameters(storageSharedKeyCredential).ToString();
+            UriBuilder sasUri = new UriBuilder(container.Uri);
+            sasUri.Query = sas;
+            //Return the URI string for the container, including the SAS token.
+            return sasUri;
         }
 
         /// <summary>
@@ -207,65 +219,83 @@ namespace SasTutorial
         /// </summary>
         /// <param name="container">A reference to the container.</param>
         /// <param name="blobName">A string containing the name of the blob.</param>
-        /// <param name="policyName">A string containing the name of the stored access policy. If null, an ad-hoc SAS is created.</param>
+        /// <param name="StorageSharedKeyCredential">Storage Shared Key Credential.</param>
         /// <returns>A string containing the URI for the blob, with the SAS token appended.</returns>
-        static string GetBlobSasUri(CloudBlobContainer container, string blobName, string policyName = null)
+        static UriBuilder GetBlobSasUri(BlobContainerClient container, string blobName, StorageSharedKeyCredential storageSharedKeyCredential)
         {
-            string sasBlobToken;
-
             //Get a reference to a blob within the container.
             //Note that the blob may not exist yet, but a SAS can still be created for it.
-            CloudBlockBlob blob = container.GetBlockBlobReference(blobName);
+            BlobClient blob = container.GetBlobClient(blobName);
 
-            if (policyName == null)
+
+            var policy = new BlobSasBuilder
+
             {
-                // Create a new access policy and define its constraints.
-                // Note that the SharedAccessBlobPolicy class is used both to define the parameters of an ad-hoc SAS, and 
-                // to construct a shared access policy that is saved to the container's shared access policies. 
-                SharedAccessBlobPolicy adHocSAS = new SharedAccessBlobPolicy()
-                {
-                    // Set start time to five minutes before now to avoid clock skew.
-                    SharedAccessStartTime = DateTime.UtcNow.AddMinutes(-5),
-                    SharedAccessExpiryTime = DateTime.UtcNow.AddHours(24),
-                    Permissions = SharedAccessBlobPermissions.Read | SharedAccessBlobPermissions.Write | SharedAccessBlobPermissions.Create
-                };
-
-                //Generate the shared access signature on the blob, setting the constraints directly on the signature.
-                sasBlobToken = blob.GetSharedAccessSignature(adHocSAS);
-            }
-            else
-            {
-                //Generate the shared access signature on the blob. In this case, all of the constraints for the
-                //shared access signature are specified on the container's stored access policy.
-                sasBlobToken = blob.GetSharedAccessSignature(null, policyName);
-            }
-
+                Protocol = SasProtocol.HttpsAndHttp,
+                BlobContainerName = container.Name,
+                BlobName = blobName,
+                Resource = "b",
+                StartsOn = DateTimeOffset.UtcNow,
+                ExpiresOn = DateTimeOffset.UtcNow.AddHours(1),
+                IPRange = new SasIPRange(IPAddress.None, IPAddress.None)
+            };
+            policy.SetPermissions(BlobSasPermissions.All);
+            var sas = policy.ToSasQueryParameters(storageSharedKeyCredential).ToString();
+            UriBuilder sasUri = new UriBuilder(blob.Uri);
+            sasUri.Query = sas;
             //Return the URI string for the container, including the SAS token.
-            return blob.Uri + sasBlobToken;
+            return sasUri;
         }
 
         /// <summary>
-        /// Creates a shared access policy on the container.
+        /// Returns a URI containing a SAS for the blob.
         /// </summary>
         /// <param name="container">A reference to the container.</param>
-        /// <param name="policyName">The name of the stored access policy.</param>
-        static void CreateSharedAccessPolicy(CloudBlobContainer container,
-            string policyName)
+        /// <param name="blobName">A string containing the name of the blob.</param>
+        /// <param name="policyName">A string containing the name of the stored access policy.</param>
+        /// <param name="StorageSharedKeyCredential">Storage Shared Key Credential.</param>
+        /// <returns>A string containing the URI for the blob, with the SAS token appended.</returns>
+        static UriBuilder GetBlobSasUri(BlobContainerClient container, string blobName, string storeAccessPolicyName, StorageSharedKeyCredential storageSharedKeyCredential)
         {
-            //Create a new shared access policy and define its constraints.
-            SharedAccessBlobPolicy sharedPolicy = new SharedAccessBlobPolicy()
+            //Get a reference to a blob within the container.
+            //Note that the blob may not exist yet, but a SAS can still be created for it.
+            BlobClient blob = container.GetBlobClient(blobName);
+
+
+            var policy = new BlobSasBuilder
+
             {
-                SharedAccessExpiryTime = DateTime.UtcNow.AddHours(24),
-                Permissions = SharedAccessBlobPermissions.Read | SharedAccessBlobPermissions.List |
-                    SharedAccessBlobPermissions.Write | SharedAccessBlobPermissions.Create | SharedAccessBlobPermissions.Delete
+                BlobContainerName = container.Name,
+                BlobName = blobName,
+                Identifier= storeAccessPolicyName
+            };
+            var sas = policy.ToSasQueryParameters(storageSharedKeyCredential).ToString();
+            UriBuilder sasUri = new UriBuilder(blob.Uri);
+            sasUri.Query = sas;
+            //Return the URI string for the container, including the SAS token.
+            return sasUri;
+        }
+
+
+
+        static void CreateStoreAccessPolicy(BlobContainerClient container, string policyName)
+        {
+            IEnumerable<BlobSignedIdentifier> permissions = new[]
+            {
+                new BlobSignedIdentifier
+                {
+                    Id = policyName,
+                    AccessPolicy =
+                        new BlobAccessPolicy
+                        {
+                            PolicyStartsOn = DateTimeOffset.UtcNow.AddHours(-1),
+                            PolicyExpiresOn =  DateTimeOffset.UtcNow.AddHours(1),
+                            Permissions = "racwdl"
+                        }
+                }
             };
 
-            //Get the container's existing permissions.
-            BlobContainerPermissions permissions = container.GetPermissions();
-
-            //Add the new policy to the container's permissions, and set the container's permissions.
-            permissions.SharedAccessPolicies.Add(policyName, sharedPolicy);
-            container.SetPermissions(permissions);
+            container.SetAccessPolicy(PublicAccessType.None, permissions);
         }
 
         /// <summary>
@@ -274,17 +304,17 @@ namespace SasTutorial
         /// <param name="sasUri">A string containing a URI with a SAS appended.</param>
         /// <param name="blobName">A string containing the name of the blob.</param>
         /// <param name="blobContent">A string content content to write to the blob.</param>
-        static void TestContainerSAS(string sasUri, string blobName, string blobContent)
+        static void TestContainerSAS(UriBuilder sasUri, string blobName, string blobContent)
         {
             //Try performing container operations with the SAS provided.
             //Note that the storage account credentials are not required here; the SAS provides the necessary
             //authentication information on the URI.
 
             //Return a reference to the container using the SAS URI.
-            CloudBlobContainer container = new CloudBlobContainer(new Uri(sasUri));
+            BlobContainerClient container = new BlobContainerClient(sasUri.Uri);
 
             //Return a reference to a blob to be created in the container.
-            CloudBlockBlob blob = container.GetBlockBlobReference(blobName);
+            BlobClient blob = container.GetBlobClient(blobName);
 
             //Write operation: Upload a new blob to the container.
             try
@@ -293,12 +323,12 @@ namespace SasTutorial
                 msWrite.Position = 0;
                 using (msWrite)
                 {
-                    blob.UploadFromStream(msWrite);
+                    blob.Upload(msWrite);
                 }
                 Console.WriteLine("Write operation succeeded for SAS " + sasUri);
                 Console.WriteLine();
             }
-            catch (StorageException e)
+            catch (Exception e)
             {
                 Console.WriteLine("Write operation failed for SAS " + sasUri);
                 Console.WriteLine("Additional error information: " + e.Message);
@@ -308,14 +338,14 @@ namespace SasTutorial
             //List operation: List the blobs in the container.
             try
             {
-                foreach (ICloudBlob blobItem in container.ListBlobs())
+                foreach (BlobItem blobItem in container.GetBlobs())
                 {
-                    Console.WriteLine(blobItem.Uri);
+                    Console.WriteLine(blobItem.Name);
                 }
                 Console.WriteLine("List operation succeeded for SAS " + sasUri);
                 Console.WriteLine();
             }
-            catch (StorageException e)
+            catch (Exception e)
             {
                 Console.WriteLine("List operation failed for SAS " + sasUri);
                 Console.WriteLine("Additional error information: " + e.Message);
@@ -325,18 +355,14 @@ namespace SasTutorial
             //Read operation: Read the contents of the blob we created above.
             try
             {
-                MemoryStream msRead = new MemoryStream();
-                msRead.Position = 0;
-                using (msRead)
-                {
-                    blob.DownloadToStream(msRead);
-                    Console.WriteLine(msRead.Length);
-                }
+              
+                BlobDownloadInfo download = blob.Download();
+                Console.WriteLine(download.ContentLength);
                 Console.WriteLine();
                 Console.WriteLine("Read operation succeeded for SAS " + sasUri);
                 Console.WriteLine();
             }
-            catch (StorageException e)
+            catch (Exception e)
             {
                 Console.WriteLine("Read operation failed for SAS " + sasUri);
                 Console.WriteLine("Additional error information: " + e.Message);
@@ -351,7 +377,7 @@ namespace SasTutorial
                 Console.WriteLine("Delete operation succeeded for SAS " + sasUri);
                 Console.WriteLine();
             }
-            catch (StorageException e)
+            catch (Exception e)
             {
                 Console.WriteLine("Delete operation failed for SAS " + sasUri);
                 Console.WriteLine("Additional error information: " + e.Message);
@@ -364,12 +390,12 @@ namespace SasTutorial
         /// </summary>
         /// <param name="sasUri">A string containing a URI with a SAS appended.</param>
         /// <param name="blobContent">A string content content to write to the blob.</param>
-        static void TestBlobSAS(string sasUri, string blobContent)
+        static void TestBlobSAS(UriBuilder sasUri, string blobContent)
         {
             //Try performing blob operations using the SAS provided.
 
             //Return a reference to the blob using the SAS URI.
-            CloudBlockBlob blob = new CloudBlockBlob(new Uri(sasUri));
+            BlobClient blob = new BlobClient(sasUri.Uri);
 
             //Create operation: Upload a blob with the specified name to the container.
             //If the blob does not exist, it will be created. If it does exist, it will be overwritten.
@@ -380,12 +406,12 @@ namespace SasTutorial
                 msWrite.Position = 0;
                 using (msWrite)
                 {
-                    blob.UploadFromStream(msWrite);
+                    blob.Upload(msWrite);
                 }
                 Console.WriteLine("Create operation succeeded for SAS " + sasUri);
                 Console.WriteLine();
             }
-            catch (StorageException e)
+            catch (Exception e)
             {
                 Console.WriteLine("Create operation failed for SAS " + sasUri);
                 Console.WriteLine("Additional error information: " + e.Message);
@@ -395,17 +421,13 @@ namespace SasTutorial
             // Write operation: Add metadata to the blob
             try
             {
-                blob.FetchAttributes();
-                string rnd = new Random().Next().ToString();
-                string metadataName = "name";
-                string metadataValue = "value";
-                blob.Metadata.Add(metadataName, metadataValue);
-                blob.SetMetadata();
-
+                IDictionary<string, string> metadata = new Dictionary<string, string>();
+                metadata.Add("name", "value");
+                blob.SetMetadata(metadata);            
                 Console.WriteLine("Write operation succeeded for SAS " + sasUri);
                 Console.WriteLine();
             }
-            catch (StorageException e)
+            catch (Exception e)
             {
                 Console.WriteLine("Write operation failed for SAS " + sasUri);
                 Console.WriteLine("Additional error information: " + e.Message);
@@ -414,26 +436,21 @@ namespace SasTutorial
 
             //Read operation: Read the contents of the blob.
             try
-            {
-                MemoryStream msRead = new MemoryStream();
-                using (msRead)
+            { 
+                BlobDownloadInfo download = blob.Download();   
+                using (StreamReader reader = new StreamReader(download.Content, true))
                 {
-                    blob.DownloadToStream(msRead);
-                    msRead.Position = 0;
-                    using (StreamReader reader = new StreamReader(msRead, true))
+                    string line;
+                    while ((line = reader.ReadLine()) != null)
                     {
-                        string line;
-                        while ((line = reader.ReadLine()) != null)
-                        {
-                            Console.WriteLine(line);
-                        }
+                        Console.WriteLine(line);
                     }
-                    Console.WriteLine();
                 }
+                Console.WriteLine();
                 Console.WriteLine("Read operation succeeded for SAS " + sasUri);
                 Console.WriteLine();
             }
-            catch (StorageException e)
+            catch (Exception e)
             {
                 Console.WriteLine("Read operation failed for SAS " + sasUri);
                 Console.WriteLine("Additional error information: " + e.Message);
@@ -447,7 +464,7 @@ namespace SasTutorial
                 Console.WriteLine("Delete operation succeeded for SAS " + sasUri);
                 Console.WriteLine();
             }
-            catch (StorageException e)
+            catch (Exception e)
             {
                 Console.WriteLine("Delete operation failed for SAS " + sasUri);
                 Console.WriteLine("Additional error information: " + e.Message);
