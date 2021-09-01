@@ -15,15 +15,14 @@
 //----------------------------------------------------------------------------------
 
 using System;
-using System.Text;
-using System.IO;
-using Microsoft.Azure;
-using Azure.Storage.Blobs;
-using Azure.Storage;
-using Azure.Storage.Sas;
-using System.Net;
-using Azure.Storage.Blobs.Models;
 using System.Collections.Generic;
+using System.Net;
+using Azure;
+using Azure.Storage;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
+using Azure.Storage.Sas;
+using Microsoft.Azure;
 
 namespace SasTutorial
 {
@@ -101,11 +100,11 @@ namespace SasTutorial
             //Get a reference to a container to use for the sample code, and create it if it does not exist.
             BlobContainerClient container = blobServiceClient.GetBlobContainerClient(containerName);
 
-            try 
-            { 
+            try
+            {
                 container.CreateIfNotExists();
             }
-            catch (Exception)
+            catch (RequestFailedException)
             {
                 // Ensure that the storage emulator is running if using emulator connection string.
                 Console.WriteLine("If you are running with the default connection string, please make sure you have started the storage emulator. Press the Windows key and type Azure Storage to select and run it from the list of applications - then restart the sample.");
@@ -133,7 +132,7 @@ namespace SasTutorial
             //Generate an  SAS URI for the container. The  SAS has all permissions.
             UriBuilder containerSAS = GetContainerSasUri(container, storageSharedKeyCredential);
             Console.WriteLine("1. SAS for blob container : " + containerSAS);
-            Console.WriteLine(); 
+            Console.WriteLine();
 
             //Test the SAS to ensure it works as expected.
             //The write, read, and delete operations should  succeed, and the list operations should fail.
@@ -267,7 +266,7 @@ namespace SasTutorial
             {
                 BlobContainerName = container.Name,
                 BlobName = blobName,
-                Identifier= storeAccessPolicyName
+                Identifier = storeAccessPolicyName
             };
             var sas = policy.ToSasQueryParameters(storageSharedKeyCredential).ToString();
             UriBuilder sasUri = new UriBuilder(blob.Uri);
@@ -319,16 +318,11 @@ namespace SasTutorial
             //Write operation: Upload a new blob to the container.
             try
             {
-                MemoryStream msWrite = new MemoryStream(Encoding.UTF8.GetBytes(blobContent));
-                msWrite.Position = 0;
-                using (msWrite)
-                {
-                    blob.Upload(msWrite);
-                }
+                blob.Upload(BinaryData.FromString(blobContent));
                 Console.WriteLine("Write operation succeeded for SAS " + sasUri);
                 Console.WriteLine();
             }
-            catch (Exception e)
+            catch (RequestFailedException e)
             {
                 Console.WriteLine("Write operation failed for SAS " + sasUri);
                 Console.WriteLine("Additional error information: " + e.Message);
@@ -345,7 +339,7 @@ namespace SasTutorial
                 Console.WriteLine("List operation succeeded for SAS " + sasUri);
                 Console.WriteLine();
             }
-            catch (Exception e)
+            catch (RequestFailedException e)
             {
                 Console.WriteLine("List operation failed for SAS " + sasUri);
                 Console.WriteLine("Additional error information: " + e.Message);
@@ -355,14 +349,14 @@ namespace SasTutorial
             //Read operation: Read the contents of the blob we created above.
             try
             {
-              
+
                 BlobDownloadInfo download = blob.Download();
                 Console.WriteLine(download.ContentLength);
                 Console.WriteLine();
                 Console.WriteLine("Read operation succeeded for SAS " + sasUri);
                 Console.WriteLine();
             }
-            catch (Exception e)
+            catch (RequestFailedException e)
             {
                 Console.WriteLine("Read operation failed for SAS " + sasUri);
                 Console.WriteLine("Additional error information: " + e.Message);
@@ -377,7 +371,7 @@ namespace SasTutorial
                 Console.WriteLine("Delete operation succeeded for SAS " + sasUri);
                 Console.WriteLine();
             }
-            catch (Exception e)
+            catch (RequestFailedException e)
             {
                 Console.WriteLine("Delete operation failed for SAS " + sasUri);
                 Console.WriteLine("Additional error information: " + e.Message);
@@ -402,16 +396,11 @@ namespace SasTutorial
             try
             {
                 //string blobContent = "This blob was created with a shared access signature granting write permissions to the blob. ";
-                MemoryStream msWrite = new MemoryStream(Encoding.UTF8.GetBytes(blobContent));
-                msWrite.Position = 0;
-                using (msWrite)
-                {
-                    blob.Upload(msWrite);
-                }
+                blob.Upload(BinaryData.FromString(blobContent));
                 Console.WriteLine("Create operation succeeded for SAS " + sasUri);
                 Console.WriteLine();
             }
-            catch (Exception e)
+            catch (RequestFailedException e)
             {
                 Console.WriteLine("Create operation failed for SAS " + sasUri);
                 Console.WriteLine("Additional error information: " + e.Message);
@@ -423,11 +412,11 @@ namespace SasTutorial
             {
                 IDictionary<string, string> metadata = new Dictionary<string, string>();
                 metadata.Add("name", "value");
-                blob.SetMetadata(metadata);            
+                blob.SetMetadata(metadata);
                 Console.WriteLine("Write operation succeeded for SAS " + sasUri);
                 Console.WriteLine();
             }
-            catch (Exception e)
+            catch (RequestFailedException e)
             {
                 Console.WriteLine("Write operation failed for SAS " + sasUri);
                 Console.WriteLine("Additional error information: " + e.Message);
@@ -436,21 +425,16 @@ namespace SasTutorial
 
             //Read operation: Read the contents of the blob.
             try
-            { 
-                BlobDownloadInfo download = blob.Download();   
-                using (StreamReader reader = new StreamReader(download.Content, true))
-                {
-                    string line;
-                    while ((line = reader.ReadLine()) != null)
-                    {
-                        Console.WriteLine(line);
-                    }
-                }
+            {
+                BlobDownloadResult download = blob.DownloadContent();
+                string content = download.Content.ToString();
+                Console.WriteLine(content);
                 Console.WriteLine();
+
                 Console.WriteLine("Read operation succeeded for SAS " + sasUri);
                 Console.WriteLine();
             }
-            catch (Exception e)
+            catch (RequestFailedException e)
             {
                 Console.WriteLine("Read operation failed for SAS " + sasUri);
                 Console.WriteLine("Additional error information: " + e.Message);
@@ -464,7 +448,7 @@ namespace SasTutorial
                 Console.WriteLine("Delete operation succeeded for SAS " + sasUri);
                 Console.WriteLine();
             }
-            catch (Exception e)
+            catch (RequestFailedException e)
             {
                 Console.WriteLine("Delete operation failed for SAS " + sasUri);
                 Console.WriteLine("Additional error information: " + e.Message);
