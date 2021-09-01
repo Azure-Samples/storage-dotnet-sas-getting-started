@@ -16,13 +16,13 @@
 
 using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Net;
 using Azure;
 using Azure.Storage;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Sas;
-using Microsoft.Azure;
 
 namespace SasTutorial
 {
@@ -95,7 +95,7 @@ namespace SasTutorial
             string storeAccessPolicyName = policyPrefix + DateTime.Now.Ticks.ToString();
 
             //Parse the connection string and return a reference to the storage account.
-            BlobServiceClient blobServiceClient = new BlobServiceClient(CloudConfigurationManager.GetSetting("StorageConnectionString"));
+            BlobServiceClient blobServiceClient = new BlobServiceClient(ConfigurationManager.AppSettings["StorageConnectionString"]);
 
             //Get a reference to a container to use for the sample code, and create it if it does not exist.
             BlobContainerClient container = blobServiceClient.GetBlobContainerClient(containerName);
@@ -115,7 +115,7 @@ namespace SasTutorial
             //Create a new access policy on the container, which may be optionally used to provide constraints for
             //shared access signatures on the container and the blob.
             //The access policy provides create, write, read, list, and delete permissions.
-            StorageSharedKeyCredential storageSharedKeyCredential = new StorageSharedKeyCredential(blobServiceClient.AccountName, CloudConfigurationManager.GetSetting("AzureStorageEmulatorAccountKey"));
+            StorageSharedKeyCredential storageSharedKeyCredential = new StorageSharedKeyCredential(blobServiceClient.AccountName,ConfigurationManager.AppSettings["AzureStorageEmulatorAccountKey"]);
 
             CreateStoreAccessPolicy(container, storeAccessPolicyName);
 
