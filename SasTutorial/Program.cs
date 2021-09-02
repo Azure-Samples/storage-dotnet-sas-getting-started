@@ -17,7 +17,6 @@
 using System;
 using System.Collections.Generic;
 using System.Configuration;
-using System.Net;
 using Azure;
 using Azure.Storage;
 using Azure.Storage.Blobs;
@@ -95,7 +94,7 @@ namespace SasTutorial
             string storeAccessPolicyName = policyPrefix + DateTime.Now.Ticks.ToString();
 
             //Parse the connection string and return a reference to the storage account.
-            BlobServiceClient blobServiceClient = new BlobServiceClient(ConfigurationManager.AppSettings["StorageConnectionString"]);
+            BlobServiceClient blobServiceClient = new BlobServiceClient(ConfigurationManager.AppSettings.Get("StorageConnectionString"));
 
             //Get a reference to a container to use for the sample code, and create it if it does not exist.
             BlobContainerClient container = blobServiceClient.GetBlobContainerClient(containerName);
@@ -115,7 +114,7 @@ namespace SasTutorial
             //Create a new access policy on the container, which may be optionally used to provide constraints for
             //shared access signatures on the container and the blob.
             //The access policy provides create, write, read, list, and delete permissions.
-            StorageSharedKeyCredential storageSharedKeyCredential = new StorageSharedKeyCredential(blobServiceClient.AccountName,ConfigurationManager.AppSettings["AzureStorageEmulatorAccountKey"]);
+            StorageSharedKeyCredential storageSharedKeyCredential = new StorageSharedKeyCredential(blobServiceClient.AccountName,ConfigurationManager.AppSettings.Get("AzureStorageEmulatorAccountKey"));
 
             CreateStoreAccessPolicy(container, storeAccessPolicyName);
 
@@ -126,11 +125,11 @@ namespace SasTutorial
 
             //Test the SAS to ensure it works as expected.
             //The write, read, and delete operations should  succeed, and the list operations should fail.
-            TestContainerSAS(storeContainerSAS, blobName1, blobContent1);
+            TestContainerSAS(storeContainerSAS.Uri, blobName1, blobContent1);
             Console.WriteLine();
 
             //Generate an  SAS URI for the container. The  SAS has all permissions.
-            UriBuilder containerSAS = GetContainerSasUri(container, storageSharedKeyCredential);
+            Uri containerSAS = container.GenerateSasUri(BlobContainerSasPermissions.All, DateTimeOffset.UtcNow.AddHours(1));
             Console.WriteLine("1. SAS for blob container : " + containerSAS);
             Console.WriteLine();
 
@@ -140,7 +139,7 @@ namespace SasTutorial
             Console.WriteLine();
 
             //Generate an  SAS URI for a blob within the container. The  SAS has all permissions.
-            UriBuilder storeBlobSAS = GetBlobSasUri(container, blobName2, storageSharedKeyCredential);
+            Uri storeBlobSAS = container.GetBlobClient(blobName2).GenerateSasUri(BlobSasPermissions.All, DateTimeOffset.UtcNow.AddHours(1));
             Console.WriteLine("3. SAS for blob : " + storeBlobSAS);
             Console.WriteLine();
 
@@ -150,7 +149,7 @@ namespace SasTutorial
             Console.WriteLine();
 
             //Generate an  SAS URI for a blob within the container. The  SAS has all permissions.
-            UriBuilder blobSAS = GetBlobSasUri(container, blobName4, storageSharedKeyCredential);
+            Uri blobSAS = container.GetBlobClient(blobName4).GenerateSasUri(BlobSasPermissions.All, DateTimeOffset.UtcNow.AddHours(1));
             Console.WriteLine("3. SAS for blob : " + blobSAS);
             Console.WriteLine();
 
@@ -163,32 +162,6 @@ namespace SasTutorial
             container.DeleteIfExists();
 
             Console.ReadLine();
-        }
-
-        /// <summary>
-        /// Returns a URI containing a SAS for the blob container.
-        /// </summary>
-        /// <param name="container">A reference to the container.</param>
-        /// <param name="StorageSharedKeyCredential">Storage Shared Key Credential.</param>
-        /// <returns>A string containing the URI for the container, with the SAS token appended.</returns>
-        static UriBuilder GetContainerSasUri(BlobContainerClient container, StorageSharedKeyCredential storageSharedKeyCredential)
-        {
-            var policy = new BlobSasBuilder
-            {
-                Protocol = SasProtocol.HttpsAndHttp,
-
-                BlobContainerName = container.Name,
-                Resource = "c",
-                StartsOn = DateTimeOffset.UtcNow,
-                ExpiresOn = DateTimeOffset.UtcNow.AddHours(1),
-                IPRange = new SasIPRange(IPAddress.None, IPAddress.None)
-            };
-            policy.SetPermissions(BlobSasPermissions.All);
-            var sas = policy.ToSasQueryParameters(storageSharedKeyCredential).ToString();
-            UriBuilder sasUri = new UriBuilder(container.Uri);
-            sasUri.Query = sas;
-            //Return the URI string for the container, including the SAS token.
-            return sasUri;
         }
 
         /// <summary>
@@ -212,70 +185,6 @@ namespace SasTutorial
             //Return the URI string for the container, including the SAS token.
             return sasUri;
         }
-
-        /// <summary>
-        /// Returns a URI containing a SAS for the blob.
-        /// </summary>
-        /// <param name="container">A reference to the container.</param>
-        /// <param name="blobName">A string containing the name of the blob.</param>
-        /// <param name="StorageSharedKeyCredential">Storage Shared Key Credential.</param>
-        /// <returns>A string containing the URI for the blob, with the SAS token appended.</returns>
-        static UriBuilder GetBlobSasUri(BlobContainerClient container, string blobName, StorageSharedKeyCredential storageSharedKeyCredential)
-        {
-            //Get a reference to a blob within the container.
-            //Note that the blob may not exist yet, but a SAS can still be created for it.
-            BlobClient blob = container.GetBlobClient(blobName);
-
-
-            var policy = new BlobSasBuilder
-
-            {
-                Protocol = SasProtocol.HttpsAndHttp,
-                BlobContainerName = container.Name,
-                BlobName = blobName,
-                Resource = "b",
-                StartsOn = DateTimeOffset.UtcNow,
-                ExpiresOn = DateTimeOffset.UtcNow.AddHours(1),
-                IPRange = new SasIPRange(IPAddress.None, IPAddress.None)
-            };
-            policy.SetPermissions(BlobSasPermissions.All);
-            var sas = policy.ToSasQueryParameters(storageSharedKeyCredential).ToString();
-            UriBuilder sasUri = new UriBuilder(blob.Uri);
-            sasUri.Query = sas;
-            //Return the URI string for the container, including the SAS token.
-            return sasUri;
-        }
-
-        /// <summary>
-        /// Returns a URI containing a SAS for the blob.
-        /// </summary>
-        /// <param name="container">A reference to the container.</param>
-        /// <param name="blobName">A string containing the name of the blob.</param>
-        /// <param name="policyName">A string containing the name of the stored access policy.</param>
-        /// <param name="StorageSharedKeyCredential">Storage Shared Key Credential.</param>
-        /// <returns>A string containing the URI for the blob, with the SAS token appended.</returns>
-        static UriBuilder GetBlobSasUri(BlobContainerClient container, string blobName, string storeAccessPolicyName, StorageSharedKeyCredential storageSharedKeyCredential)
-        {
-            //Get a reference to a blob within the container.
-            //Note that the blob may not exist yet, but a SAS can still be created for it.
-            BlobClient blob = container.GetBlobClient(blobName);
-
-
-            var policy = new BlobSasBuilder
-
-            {
-                BlobContainerName = container.Name,
-                BlobName = blobName,
-                Identifier = storeAccessPolicyName
-            };
-            var sas = policy.ToSasQueryParameters(storageSharedKeyCredential).ToString();
-            UriBuilder sasUri = new UriBuilder(blob.Uri);
-            sasUri.Query = sas;
-            //Return the URI string for the container, including the SAS token.
-            return sasUri;
-        }
-
-
 
         static void CreateStoreAccessPolicy(BlobContainerClient container, string policyName)
         {
@@ -303,14 +212,14 @@ namespace SasTutorial
         /// <param name="sasUri">A string containing a URI with a SAS appended.</param>
         /// <param name="blobName">A string containing the name of the blob.</param>
         /// <param name="blobContent">A string content content to write to the blob.</param>
-        static void TestContainerSAS(UriBuilder sasUri, string blobName, string blobContent)
+        static void TestContainerSAS(Uri sasUri, string blobName, string blobContent)
         {
             //Try performing container operations with the SAS provided.
             //Note that the storage account credentials are not required here; the SAS provides the necessary
             //authentication information on the URI.
 
             //Return a reference to the container using the SAS URI.
-            BlobContainerClient container = new BlobContainerClient(sasUri.Uri);
+            BlobContainerClient container = new BlobContainerClient(sasUri);
 
             //Return a reference to a blob to be created in the container.
             BlobClient blob = container.GetBlobClient(blobName);
@@ -384,12 +293,12 @@ namespace SasTutorial
         /// </summary>
         /// <param name="sasUri">A string containing a URI with a SAS appended.</param>
         /// <param name="blobContent">A string content content to write to the blob.</param>
-        static void TestBlobSAS(UriBuilder sasUri, string blobContent)
+        static void TestBlobSAS(Uri sasUri, string blobContent)
         {
             //Try performing blob operations using the SAS provided.
 
             //Return a reference to the blob using the SAS URI.
-            BlobClient blob = new BlobClient(sasUri.Uri);
+            BlobClient blob = new BlobClient(sasUri);
 
             //Create operation: Upload a blob with the specified name to the container.
             //If the blob does not exist, it will be created. If it does exist, it will be overwritten.
